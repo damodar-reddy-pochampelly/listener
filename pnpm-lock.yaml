@@ -1,7 +1,7 @@
 lockfileVersion: 5.3
 
 specifiers:
-  bson: ^4.1.0
+  bson: 4.2.0
   dotenv: ^16.3.1
   express: ^4.18.2
   http: ^0.0.1-security
@@ -11,7 +11,7 @@ specifiers:
   socket.io: ^4.7.2
 
 dependencies:
-  bson: 4.7.2
+  bson: 4.2.0
   dotenv: 16.3.1
   express: 4.18.2
   http: 0.0.1-security
@@ -145,8 +145,8 @@ packages:
     engines: {node: '>=0.6.19'}
     dev: false
 
-  /bson/4.7.2:
-    resolution: {integrity: sha512-Ry9wCtIZ5kGqkJoi6aD8KjxFZEx78guTQDnpXWiNthsxzrxAK/i8E6pCHAIZTbaEFWcOCvbecMukfK7XUvyLpQ==}
+  /bson/4.2.0:
+    resolution: {integrity: sha512-c3MlJqdROnCRvDr/+MLfaDvQ7CvGI4p1hKX45/fvgzSwKRdOjsfRug1NJJ8ty5mXCNtUdjJEWzoZWcBQxV4TyA==}
     engines: {node: '>=6.9.0'}
     dependencies:
       buffer: 5.7.1
