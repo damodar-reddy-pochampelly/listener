@@ -1,110 +1,67 @@
 require("dotenv").config();
-const express = require("express");
-const http = require("http");
-const socketIo = require("socket.io");
-const mongoose = require("mongoose");
+const io = require("socket.io")();
 const crypto = require("crypto");
-const path = require("path");
+const MongoClient = require("mongodb").MongoClient;
+const url = MONGODB_URI;
+const dbName = "your_db_name_here";
 
-const app = express();
-const server = http.createServer(app);
-const io = socketIo(server);
-const port = process.env.PORT || 3000;
-
-// Allow CORS for your frontend (replace 'http://yourfrontendurl.com' with your frontend's URL)
-app.use((req, res, next) => {
-  res.header(
-    "Access-Control-Allow-Origin",
-    "https://timerseries-web.onrender.com"
-  );
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept"
-  );
-  next();
-});
-
-// Replace with your MongoDB connection string
-mongoose.connect(
-  process.env.MONGODB_URI, // Replace with your database name
-  {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  }
-);
-const db = mongoose.connection;
-db.on("error", console.error.bind(console, "MongoDB connection error:"));
-db.once("open", () => {
-  console.log("Connected to MongoDB");
-});
-
-// Create a Mongoose model for your time series data (replace 'TimeSeries' with your model name)
-const timeSeriesSchema = new mongoose.Schema({
-  name: String,
-  origin: String,
-  destination: String,
-  timestamp: Date,
-});
-const TimeSeriesModel = mongoose.model("TimeSeries", timeSeriesSchema);
-
-// Serve the React frontend (make sure to build your React app first)
-app.use(express.static(path.join(__dirname, "build")));
+const PORT = 3000;
 
 io.on("connection", (socket) => {
-  console.log("A user connected");
+  console.log("Emitter connected");
 
-  socket.on("data", (encryptedData) => {
-    const messages = encryptedData.messages; // Updated to handle messages array
-    const secretKey = encryptedData.secretKey;
+  socket.on("encryptedMessageStream", (messageStream) => {
+    const messages = messageStream.split("|");
 
-    messages.forEach((message) => {
-      const [iv, encryptedMessage, authTag] = message.split("|");
-      const decryptedData = decryptData(
-        encryptedMessage,
-        iv,
-        secretKey,
-        authTag
-      );
+    messages.forEach((encryptedMessage) => {
+      // Decrypt the message using the same AES-256-CTR algorithm and pass key
+      const decryptedMessage = crypto
+        .createDecipher("aes-256-ctr", "your_pass_key_here")
+        .update(encryptedMessage, "hex", "utf8");
 
-      console.log("Decrypted Data:", decryptedData);
+      // Parse the decrypted message
+      const messageObj = JSON.parse(decryptedMessage);
 
-      // Save the decrypted data to the database
-      const timeSeries = new TimeSeriesModel({
-        name: decryptedData.name,
-        origin: decryptedData.origin,
-        destination: decryptedData.destination,
-        timestamp: decryptedData.timestamp,
-      });
-      timeSeries.save();
+      // Validate the secret_key
+      const secret_key = crypto
+        .createHash("sha256")
+        .update(
+          JSON.stringify({
+            name: messageObj.name,
+            origin: messageObj.origin,
+            destination: messageObj.destination,
+          })
+        )
+        .digest("hex");
+
+      if (secret_key === messageObj.secret_key) {
+        // Data integrity is valid, save to MongoDB with a timestamp
+        MongoClient.connect(url, (err, client) => {
+          if (err) throw err;
+
+          const db = client.db(dbName);
+          const collection = db.collection("timeseries");
+
+          const timestamp = new Date();
+          const minute = timestamp.getMinutes();
+
+          collection.updateOne(
+            { minute },
+            { $push: { data: { ...messageObj, timestamp } } },
+            { upsert: true },
+            (error) => {
+              if (error) throw error;
+              console.log("Data saved to MongoDB");
+              client.close();
+            }
+          );
+        });
+      } else {
+        console.log("Data integrity compromised; message discarded");
+      }
     });
   });
 });
 
-function decryptData(
-  encryptedMessage,
-  iv,
-  secretKey,
-  authTag // Added authTag parameter
-) {
-  const decipher = crypto.createDecipheriv(
-    "aes-256-gcm",
-    Buffer.from(secretKey, "hex"),
-    Buffer.from(iv, "hex")
-  );
-
-  const decrypted = decipher.update(Buffer.from(encryptedMessage, "hex"));
-  decrypted += decipher.final();
-
-  const calculatedAuthTag = decipher.getAuthTag();
-
-  if (calculatedAuthTag !== authTag) {
-    throw new Error("Message authentication failed");
-  }
-
-  return decrypted.toString();
-}
-
-const PORT = process.env.PORT || 10000;
-server.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+io.listen(PORT);
+console.log(`Listener service listening on port ${PORT}`);
