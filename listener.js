@@ -25,13 +25,10 @@ app.use((req, res, next) => {
 });
 
 // Replace with your MongoDB connection string
-mongoose.connect(
-  process.env.MONGODB_URI, // Replace with your database name
-  {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  }
-);
+mongoose.connect(process.env.MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
 const db = mongoose.connection;
 db.on("error", console.error.bind(console, "MongoDB connection error:"));
 db.once("open", () => {
@@ -93,7 +90,7 @@ function decryptAndValidate(encryptedMessage) {
   try {
     const decipher = crypto.createDecipheriv(
       "aes-256-ctr",
-      Buffer.from("your-secret-passphrase", "utf-8"), // Replace with your secret passphrase
+      Buffer.from(secretKey, "hex"), // Use the same secretKey as the emitter
       Buffer.from(iv, "hex")
     );
 
