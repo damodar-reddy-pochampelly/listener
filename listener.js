@@ -71,11 +71,8 @@ io.on("connection", (socket) => {
           Buffer.from(secretKey, "hex"),
           Buffer.from(iv, "hex")
         );
-        let decryptedData = decipher.update(
-          Buffer.from(encryptedData, "hex"),
-          "hex",
-          "utf8"
-        );
+
+        let decryptedData = decipher.update(encryptedData, "hex", "utf8");
         decryptedData += decipher.final("utf8");
 
         // Validate and process decrypted data (you can save it to MongoDB here)
