@@ -72,11 +72,11 @@ io.on("connection", (socket) => {
           Buffer.from(iv, "hex")
         );
 
-        let decryptedData = decipher.update(encryptedData, "hex", "utf8");
-        decryptedData += decipher.final("utf8");
+        let decryptedData = decipher.update(Buffer.from(encryptedData, "hex"));
+        decryptedData = Buffer.concat([decryptedData, decipher.final()]);
 
         // Validate and process decrypted data (you can save it to MongoDB here)
-        const jsonData = JSON.parse(decryptedData);
+        const jsonData = JSON.parse(decryptedData.toString("utf8"));
         console.log("Received and decrypted data:", jsonData);
 
         // Save to MongoDB using Mongoose model
