@@ -13,7 +13,10 @@ const port = process.env.PORT || 3000;
 
 // Allow CORS for your frontend (replace 'http://yourfrontendurl.com' with your frontend's URL)
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "https://pdrtimeseries.ccbp.tech/");
+  res.header(
+    "Access-Control-Allow-Origin",
+    "https://timerseries-web.onrender.com/"
+  );
   res.header(
     "Access-Control-Allow-Headers",
     "Origin, X-Requested-With, Content-Type, Accept"
