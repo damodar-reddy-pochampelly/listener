@@ -55,7 +55,7 @@ io.on("connection", (socket) => {
   console.log("A user connected");
 
   // Handle incoming encrypted data stream
-  socket.on("messageStream", (dataStream) => {
+  socket.on("data", (dataStream) => {
     const encryptedMessages = dataStream.split("|");
     const validMessages = [];
 
