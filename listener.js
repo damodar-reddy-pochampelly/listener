@@ -25,10 +25,13 @@ app.use((req, res, next) => {
 });
 
 // Replace with your MongoDB connection string
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
+mongoose.connect(
+  process.env.MONGODB_URI, // Replace with your database name
+  {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  }
+);
 const db = mongoose.connection;
 db.on("error", console.error.bind(console, "MongoDB connection error:"));
 db.once("open", () => {
@@ -48,13 +51,12 @@ const TimeSeriesModel = mongoose.model("TimeSeries", timeSeriesSchema);
 app.use(express.static(path.join(__dirname, "build")));
 
 // Socket.io connection handling
-// Socket.io connection handling
 io.on("connection", (socket) => {
   console.log("A user connected");
 
   // Handle incoming encrypted data stream
-  socket.on("data", ({ data: dataStream, secretKey }) => {
-    const encryptedMessages = dataStream.split("|");
+  socket.on("data", ({ data, secretKey }) => {
+    const encryptedMessages = data.split("|");
     const validMessages = [];
 
     for (const encryptedMessage of encryptedMessages) {
@@ -85,13 +87,13 @@ io.on("connection", (socket) => {
 });
 
 // Decrypt and validate data
-function decryptAndValidate(encryptedMessage) {
+function decryptAndValidate(encryptedMessage, secretKey) {
   const [iv, encryptedData] = encryptedMessage.split("|");
 
   try {
     const decipher = crypto.createDecipheriv(
       "aes-256-ctr",
-      Buffer.from(secretKey, "hex"), // Use the same secretKey as the emitter
+      Buffer.from(secretKey, "hex"), // Use the provided secretKey
       Buffer.from(iv, "hex")
     );
 
