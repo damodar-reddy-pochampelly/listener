@@ -48,16 +48,17 @@ const TimeSeriesModel = mongoose.model("TimeSeries", timeSeriesSchema);
 app.use(express.static(path.join(__dirname, "build")));
 
 // Socket.io connection handling
+// Socket.io connection handling
 io.on("connection", (socket) => {
   console.log("A user connected");
 
   // Handle incoming encrypted data stream
-  socket.on("data", (dataStream) => {
+  socket.on("data", ({ data: dataStream, secretKey }) => {
     const encryptedMessages = dataStream.split("|");
     const validMessages = [];
 
     for (const encryptedMessage of encryptedMessages) {
-      const decryptedData = decryptAndValidate(encryptedMessage);
+      const decryptedData = decryptAndValidate(encryptedMessage, secretKey);
 
       if (decryptedData) {
         // Valid data, save to MongoDB and emit to frontend
