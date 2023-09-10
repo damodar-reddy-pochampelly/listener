@@ -60,6 +60,11 @@ io.on("connection", (socket) => {
       const encryptedMessages = messageString.split("|");
 
       for (const encryptedMessage of encryptedMessages) {
+        if (!encryptedMessage) {
+          // Skip empty messages
+          continue;
+        }
+
         const [iv, encryptedData] = encryptedMessage.split("|");
         const decipher = crypto.createDecipheriv(
           "aes-256-ctr",
