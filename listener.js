@@ -51,49 +51,37 @@ const TimeSeriesModel = mongoose.model("TimeSeries", timeSeriesSchema);
 app.use(express.static(path.join(__dirname, "build")));
 
 io.on("connection", (socket) => {
-  console.log("Listener connected");
+  console.log("A user connected");
 
-  socket.on("data", async (data) => {
-    const { data: messageString, secretKey } = data; // Destructure data object
+  socket.on("data", (encryptedData) => {
+    const messages = encryptedData.messages; // Updated to handle messages array
+    const secretKey = encryptedData.secretKey;
 
-    try {
-      const encryptedMessages = messageString.split("|");
+    messages.forEach((message) => {
+      const [iv, encryptedMessage] = message.split("|");
+      const decryptedData = decryptData(encryptedMessage, iv, secretKey);
 
-      for (const encryptedMessage of encryptedMessages) {
-        if (!encryptedMessage) {
-          // Skip empty messages
-          continue;
-        }
-
-        const [iv, encryptedData] = encryptedMessage.split("|");
-        const decipher = crypto.createDecipheriv(
-          "aes-256-ctr",
-          Buffer.from(secretKey, "hex"),
-          Buffer.from(iv, "hex")
-        );
-
-        let decryptedData = decipher.update(Buffer.from(encryptedData, "hex"));
-        decryptedData = Buffer.concat([decryptedData, decipher.final()]);
-
-        // Validate and process decrypted data (you can save it to MongoDB here)
-        const jsonData = JSON.parse(decryptedData.toString("utf8"));
-        console.log("Received and decrypted data:", jsonData);
-
-        // Save to MongoDB using Mongoose model
-        const timeseriesData = new TimeseriesData({
-          ...jsonData,
-          timestamp: new Date(),
-        });
-        await timeseriesData.save();
-      }
-    } catch (error) {
-      console.error("Error decrypting data:", error);
-    }
+      console.log("Decrypted Data:", decryptedData);
+    });
   });
 });
 
-const PORT = process.env.PORT || 4000; // Use the environment port or default to 4000
+function decryptData(encryptedMessage, iv, key) {
+  const decipher = crypto.createDecipheriv(
+    "aes-256-ctr",
+    Buffer.from(key, "hex"),
+    Buffer.from(iv, "hex")
+  );
 
+  const decrypted = Buffer.concat([
+    decipher.update(Buffer.from(encryptedMessage, "hex")),
+    decipher.final(),
+  ]);
+
+  return decrypted.toString();
+}
+
+const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
