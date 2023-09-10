@@ -3,7 +3,12 @@ const crypto = require("crypto");
 const mongoose = require("mongoose");
 const cors = require("cors");
 
-io.use(cors());
+const corsOptions = {
+  origin: "https://timerseries-web.onrender.com", // Replace with your frontend's URL
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+};
+
+io.use(cors(corsOptions));
 
 // Create a MongoDB connection
 mongoose.connect(
