@@ -1,66 +1,66 @@
-require("dotenv").config();
 const io = require("socket.io")();
 const crypto = require("crypto");
-const MongoClient = require("mongodb").MongoClient;
-const dbName = "your_db_name_here";
+const mongoose = require("mongoose");
 
-const PORT = 3000;
+mongoose.set("strictQuery", true);
+
+// Create a MongoDB connection
+mongoose.connect(
+  "mongodb+srv://damodarreddy18107:bgmjge181078@cluster0.vg9l0jd.mongodb.net/?retryWrites=true&w=majority",
+  {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  }
+);
+
+// Define a MongoDB schema and model for time-series data (adjust as needed)
+const timeSeriesSchema = new mongoose.Schema({
+  timestamp: { type: Date, default: Date.now },
+  data: Object, // Adjust the data structure as needed
+});
+
+const TimeSeries = mongoose.model("TimeSeries", timeSeriesSchema);
 
 io.on("connection", (socket) => {
   console.log("Emitter connected");
 
   socket.on("encryptedMessageStream", (messageStream) => {
-    const messages = messageStream.split("|");
+    console.log("Received encrypted message stream");
 
-    messages.forEach((encryptedMessage) => {
-      // Decrypt the message using the same AES-256-CTR algorithm and pass key
-      const decryptedMessage = crypto
-        .createDecipher("aes-256-ctr", "your_pass_key_here")
-        .update(encryptedMessage, "hex", "utf8");
+    // Split the message stream into individual encrypted messages
+    const encryptedMessages = messageStream.split("|");
 
-      // Parse the decrypted message
-      const messageObj = JSON.parse(decryptedMessage);
+    // Process each encrypted message
+    encryptedMessages.forEach((encryptedMessage) => {
+      // Decrypt the message using your decryption algorithm (e.g., aes-256-ctr)
+      const decryptionKey = crypto.randomBytes(32); // Use the appropriate key
+      const iv = crypto.randomBytes(16); // Use the appropriate IV
+      const decipher = crypto.createDecipheriv(
+        "aes-256-ctr",
+        decryptionKey,
+        iv
+      );
+      let decryptedMessage = decipher.update(encryptedMessage, "hex", "utf8");
+      decryptedMessage += decipher.final("utf8");
 
-      // Validate the secret_key
-      const secret_key = crypto
-        .createHash("sha256")
-        .update(
-          JSON.stringify({
-            name: messageObj.name,
-            origin: messageObj.origin,
-            destination: messageObj.destination,
-          })
-        )
-        .digest("hex");
+      // Output the decrypted message (as a string)
+      console.log("Decrypted message:", decryptedMessage);
 
-      if (secret_key === messageObj.secret_key) {
-        // Data integrity is valid, save to MongoDB with a timestamp
-        MongoClient.connect(MONGODB_URI, (err, client) => {
-          if (err) throw err;
-
-          const db = client.db(dbName);
-          const collection = db.collection("timeseries");
-
-          const timestamp = new Date();
-          const minute = timestamp.getMinutes();
-
-          collection.updateOne(
-            { minute },
-            { $push: { data: { ...messageObj, timestamp } } },
-            { upsert: true },
-            (error) => {
-              if (error) throw error;
-              console.log("Data saved to MongoDB");
-              client.close();
-            }
-          );
+      // Create a new TimeSeries document and save it to MongoDB
+      const timeSeriesData = new TimeSeries({
+        data: JSON.parse(decryptedMessage),
+      });
+      timeSeriesData
+        .save()
+        .then(() => {
+          console.log("Saved to MongoDB");
+        })
+        .catch((error) => {
+          console.error("Error saving to MongoDB:", error);
         });
-      } else {
-        console.log("Data integrity compromised; message discarded");
-      }
     });
   });
 });
 
-io.listen(PORT);
-console.log(`Listener service listening on port ${PORT}`);
+io.listen(3000); // Listen on port 3000
+console.log("Listener service listening on port 3000");
