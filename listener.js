@@ -1,6 +1,7 @@
 const io = require("socket.io")();
 const crypto = require("crypto");
 const mongoose = require("mongoose");
+const cors = require("cors");
 
 // Create a MongoDB connection
 mongoose.connect(
@@ -66,6 +67,7 @@ io.on("connection", (socket) => {
     });
   });
 });
+io.use(cors());
 
 io.listen(3000); // Listen on port 3000
 console.log("Listener service listening on port 3000");
