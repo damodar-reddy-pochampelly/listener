@@ -58,25 +58,48 @@ io.on("connection", (socket) => {
     const secretKey = encryptedData.secretKey;
 
     messages.forEach((message) => {
-      const [iv, encryptedMessage] = message.split("|");
-      const decryptedData = decryptData(encryptedMessage, iv, secretKey);
+      const [iv, encryptedMessage, authTag] = message.split("|");
+      const decryptedData = decryptData(
+        encryptedMessage,
+        iv,
+        secretKey,
+        authTag
+      );
 
       console.log("Decrypted Data:", decryptedData);
+
+      // Save the decrypted data to the database
+      const timeSeries = new TimeSeriesModel({
+        name: decryptedData.name,
+        origin: decryptedData.origin,
+        destination: decryptedData.destination,
+        timestamp: decryptedData.timestamp,
+      });
+      timeSeries.save();
     });
   });
 });
 
-function decryptData(encryptedMessage, iv, key) {
+function decryptData(
+  encryptedMessage,
+  iv,
+  secretKey,
+  authTag // Added authTag parameter
+) {
   const decipher = crypto.createDecipheriv(
-    "aes-256-ctr",
-    Buffer.from(key, "hex"),
+    "aes-256-gcm",
+    Buffer.from(secretKey, "hex"),
     Buffer.from(iv, "hex")
   );
 
-  const decrypted = Buffer.concat([
-    decipher.update(Buffer.from(encryptedMessage, "hex")),
-    decipher.final(),
-  ]);
+  const decrypted = decipher.update(Buffer.from(encryptedMessage, "hex"));
+  decrypted += decipher.final();
+
+  const calculatedAuthTag = decipher.getAuthTag();
+
+  if (calculatedAuthTag !== authTag) {
+    throw new Error("Message authentication failed");
+  }
 
   return decrypted.toString();
 }
