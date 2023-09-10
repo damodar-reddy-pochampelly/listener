@@ -2,7 +2,6 @@ require("dotenv").config();
 const io = require("socket.io")();
 const crypto = require("crypto");
 const MongoClient = require("mongodb").MongoClient;
-const url = MONGODB_URI;
 const dbName = "your_db_name_here";
 
 const PORT = 3000;
@@ -36,7 +35,7 @@ io.on("connection", (socket) => {
 
       if (secret_key === messageObj.secret_key) {
         // Data integrity is valid, save to MongoDB with a timestamp
-        MongoClient.connect(url, (err, client) => {
+        MongoClient.connect(MONGODB_URI, (err, client) => {
           if (err) throw err;
 
           const db = client.db(dbName);
