@@ -50,87 +50,48 @@ const TimeSeriesModel = mongoose.model("TimeSeries", timeSeriesSchema);
 // Serve the React frontend (make sure to build your React app first)
 app.use(express.static(path.join(__dirname, "build")));
 
-// Socket.io connection handling
 io.on("connection", (socket) => {
-  console.log("A user connected");
+  console.log("Listener connected");
 
-  // Handle incoming encrypted data stream
-  socket.on("data", ({ data, secretKey }) => {
-    const encryptedMessages = data.split("|");
-    const validMessages = [];
+  socket.on("data", async (data) => {
+    const { data: messageString, secretKey } = data; // Destructure data object
 
-    for (const encryptedMessage of encryptedMessages) {
-      const decryptedData = decryptAndValidate(encryptedMessage, secretKey);
+    try {
+      const encryptedMessages = messageString.split("|");
 
-      if (decryptedData) {
-        // Valid data, save to MongoDB and emit to frontend
-        const timeSeriesData = new TimeSeriesModel(decryptedData);
-        timeSeriesData.save((err) => {
-          if (err) {
-            console.error("Error saving data:", err);
-          } else {
-            console.log("Data saved:", decryptedData);
-            validMessages.push(decryptedData);
-          }
+      for (const encryptedMessage of encryptedMessages) {
+        const [iv, encryptedData] = encryptedMessage.split("|");
+        const decipher = crypto.createDecipheriv(
+          "aes-256-ctr",
+          Buffer.from(secretKey, "hex"),
+          Buffer.from(iv, "hex")
+        );
+        let decryptedData = decipher.update(
+          Buffer.from(encryptedData, "hex"),
+          "hex",
+          "utf8"
+        );
+        decryptedData += decipher.final("utf8");
+
+        // Validate and process decrypted data (you can save it to MongoDB here)
+        const jsonData = JSON.parse(decryptedData);
+        console.log("Received and decrypted data:", jsonData);
+
+        // Save to MongoDB using Mongoose model
+        const timeseriesData = new TimeseriesData({
+          ...jsonData,
+          timestamp: new Date(),
         });
+        await timeseriesData.save();
       }
+    } catch (error) {
+      console.error("Error decrypting data:", error);
     }
-
-    // Emit valid data to frontend
-    socket.emit("validData", validMessages);
-  });
-
-  // Handle disconnection
-  socket.on("disconnect", () => {
-    console.log("A user disconnected");
   });
 });
 
-// Decrypt and validate data
-function decryptAndValidate(encryptedMessage, secretKey) {
-  const [iv, encryptedData] = encryptedMessage.split("|");
+const PORT = process.env.PORT || 4000; // Use the environment port or default to 4000
 
-  try {
-    const decipher = crypto.createDecipheriv(
-      "aes-256-ctr",
-      Buffer.from(secretKey, "hex"), // Use the provided secretKey
-      Buffer.from(iv, "hex")
-    );
-
-    // Update to accumulate the decrypted data
-    let decryptedData = decipher.update(Buffer.from(encryptedData, "hex"));
-    decryptedData = Buffer.concat([decryptedData, decipher.final()]);
-
-    // Parse the decrypted data
-    const dataObj = JSON.parse(decryptedData.toString());
-
-    // Verify secret key
-    const generatedSecretKey = generateSecretKey(dataObj);
-    if (dataObj.secret_key !== generatedSecretKey) {
-      console.error("Invalid secret key");
-      return null;
-    }
-
-    return {
-      name: dataObj.name,
-      origin: dataObj.origin,
-      destination: dataObj.destination,
-      timestamp: new Date(),
-    };
-  } catch (error) {
-    console.error("Error decrypting data:", error);
-    return null;
-  }
-}
-
-// Generate a secret key for validation
-function generateSecretKey(obj) {
-  const hash = crypto.createHash("sha256");
-  hash.update(obj.name + obj.origin + obj.destination);
-  return hash.digest("hex");
-}
-
-// Start the server
-server.listen(port, () => {
-  console.log(`Listener server is running on port ${port}`);
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
