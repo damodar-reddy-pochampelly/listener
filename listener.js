@@ -3,12 +3,7 @@ const crypto = require("crypto");
 const mongoose = require("mongoose");
 const cors = require("cors");
 
-const corsOptions = {
-  origin: "https://timerseries-web.onrender.com", // Replace with your frontend's URL
-  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-};
-
-io.use(cors(corsOptions));
+io.use(cors());
 
 // Create a MongoDB connection
 mongoose.connect(
@@ -37,17 +32,35 @@ io.on("connection", (socket) => {
     const encryptedMessages = messageStream.split("|");
 
     // Process each encrypted message
-    encryptedMessages.forEach((encryptedMessage) => {
+    encryptedMessages.forEach((payload64) => {
       try {
-        // Decrypt the message using your decryption algorithm (e.g., aes-256-ctr)
-        const decryptionKey = crypto.randomBytes(32); // Use the appropriate key
-        const iv = crypto.randomBytes(16); // Use the appropriate IV
-        const decipher = crypto.createDecipheriv(
-          "aes-256-ctr",
-          decryptionKey,
-          iv
+        // Base64 decode the payload
+        const encryptedPayload = Buffer.from(payload64, "base64").toString(
+          "hex"
         );
-        let decryptedMessage = decipher.update(encryptedMessage, "hex", "utf8");
+
+        // Extract IV, encrypted message, and authentication tag
+        const iv = encryptedPayload.slice(0, 24); // 24 bytes for AES-GCM IV
+        const encryptedMessageWithAuthTag = encryptedPayload.slice(24);
+
+        // Create a Decipher object for AES-GCM decryption
+        const decipher = crypto.createDecipheriv(
+          "aes-256-gcm",
+          encryptionKey, // Use the appropriate key
+          Buffer.from(iv, "hex")
+        );
+
+        // Set the authentication tag
+        decipher.setAuthTag(
+          Buffer.from(encryptedMessageWithAuthTag.slice(-32), "hex")
+        );
+
+        // Decrypt the message
+        let decryptedMessage = decipher.update(
+          encryptedMessageWithAuthTag.slice(0, -32),
+          "hex",
+          "utf8"
+        );
         decryptedMessage += decipher.final("utf8");
 
         // Check if the decrypted message is valid JSON
@@ -75,5 +88,8 @@ io.on("connection", (socket) => {
   });
 });
 
-io.listen(3000); // Listen on port 3000
-console.log("Listener service listening on port 3000");
+const port = process.env.PORT || 3000;
+
+io.listen(port, () => {
+  console.log(`Listener service listening on port ${port}`);
+});
